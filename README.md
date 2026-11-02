@@ -6,7 +6,31 @@ An agent writes 500 lines in 10 seconds and the tests go green. Then you spend a
 
 `pr-walkthrough` is a Claude skill that makes review fast *and* keeps you the owner.
 
-## What it does
+## What you get
+
+One command-line analyzer plus an HTML report, driven by the skill:
+
+- **Where it starts:** entry points of the change and a reading order that follows the imports.
+- **Relationship map:** an offline SVG diagram of changed files and the unchanged files that import them (blast radius), colored by risk.
+- **Security leads:** hardcoded secrets, SQL built by concatenation, `eval`, XSS sinks, cleartext HTTP, tokens in `AsyncStorage`, disabled TLS, new mobile permissions, and more, each with file and line.
+- **Dependencies:** added, removed and version-changed packages from `package.json` / `requirements.txt`.
+- **PR score 1-10:** with a visible breakdown (size, security, red files, new deps, missing tests). It measures how risky the change is to *review*, not whether it is correct.
+- **Every part explained:** what changed, why (marked "inferred" when guessed), naming review, what could be removed, and a closing "Still yours to verify".
+
+See a sample (synthetic project, Hebrew): [`examples/demo/report.html`](examples/demo/report.html).
+
+The numbers come from `scripts/analyze.py` (Python 3, standard library only). The explanations are written by the agent and rendered by `scripts/render.py`.
+
+> Honest limits: the analysis is regex-based static heuristics, strongest on JS/TS/React Native and decent on Python. It is not an AST, not data-flow analysis, and not a security audit. Treat findings as leads to confirm.
+
+Run it by hand if you like:
+
+```bash
+python3 scripts/analyze.py --out facts.json                # current branch vs origin/main
+python3 scripts/render.py --facts facts.json --out report.html
+```
+
+## How the review itself works
 
 **1. Simplest version first.** Before any walkthrough, it tells you what the change is trying to do, what the simplest version would look like (rough size, labeled as an estimate), and what goes beyond what was asked.
 

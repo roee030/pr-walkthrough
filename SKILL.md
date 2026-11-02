@@ -1,6 +1,6 @@
 ---
 name: pr-walkthrough
-description: Explains a PR, diff, or chunk of agent-written code so the reader actually understands and owns it, instead of rubber-stamping it. Use whenever the user wants to review or understand a pull request, a diff, or code an AI agent wrote, asks "what did the agent do", "walk me through this", "explain this PR", "review this chunk by chunk", "go hand in hand with me", complains about odd variable or function names, about over-engineered or bloated agent code, or says they've lost track of what the code does. Also use when the user asks you to write code step by step with them in the loop. Trigger even if they never say "walkthrough". Replies in the user's language (Hebrew by default for this user), code identifiers stay in English.
+description: Explains a PR, diff, or chunk of agent-written code so the reader understands and owns it: runs a bundled analyzer that finds where the change starts, maps how files relate (diagram), flags security leads and new dependencies, scores review risk 1-10, then explains every part in an HTML report. Use whenever the user wants to review or understand a pull request, diff, or code an AI agent wrote, asks "walk me through this", "explain this PR", "what did the agent do", "score this PR", "draw the relationships", "review chunk by chunk", "go hand in hand with me", complains about odd names, over-engineered agent code, or lost track of what the code does. Also use when asked to write code step by step with the user in the loop. Trigger even if they never say "walkthrough". Replies in the user's language (Hebrew by default for this user); code identifiers stay in English.
 ---
 
 # PR Walkthrough
@@ -10,6 +10,23 @@ description: Explains a PR, diff, or chunk of agent-written code so the reader a
 An agent can write 500 lines in 10 seconds and the tests go green, but the person who has to merge it loses ownership: names they didn't choose, complexity they didn't ask for, decisions nobody explained. Reviewing turns into detective work, and the skill of understanding the code slowly atrophies.
 
 The goal of this skill is that the reader finishes the review **understanding** the change, not just approving it. Speed matters too, so effort is spent only where understanding is actually at risk. Routine code passes quickly, risky code stops and asks.
+
+## Step 0: Run the analyzer (do this first for any real diff)
+
+The skill ships two scripts in `scripts/` next to this SKILL.md (use `python3`, or `python` on Windows; stdlib only). Run them from inside the repo being reviewed:
+
+```
+python3 <skill-dir>/scripts/analyze.py --out facts.json          # branch vs origin/main
+python3 <skill-dir>/scripts/analyze.py --base <ref> --out facts.json
+python3 <skill-dir>/scripts/analyze.py --staged --out facts.json  # or --worktree
+gh pr diff <n> > pr.patch && python3 <skill-dir>/scripts/analyze.py --diff-file pr.patch --out facts.json
+```
+
+`facts.json` holds, computed (not guessed): changed files with risk level and reasons, entry points of the change, reading order, import graph with blast radius (unchanged files that import changed ones), new/removed/changed dependencies, security findings with line numbers, naming smells, and a transparent 1-10 review-risk score with its breakdown.
+
+Read `facts.json` before writing anything. Treat it as leads, not truth: it is regex-based static analysis (no AST, no data flow), so confirm every finding by reading the code, call out false positives, and say what the scanner cannot see (server behavior, runtime config, logic bugs). The score measures how risky the change is to review, not whether it is correct; never present it as a verdict.
+
+If Python is unavailable or the diff cannot be obtained, skip to Step 1 and do the same work by hand.
 
 ## Step 1: Get the change
 
@@ -43,6 +60,37 @@ For each Yellow and Red chunk use this shape, short:
 - **Could be removed**: anything that can go without changing behavior.
 
 Group all Green chunks into one line each, or one combined line. Don't narrate them.
+
+## Step 5: Write explanations.json and render the report
+
+After reading the code, write `explanations.json` (all keys optional; write it in the user's language, identifiers in English):
+
+```json
+{
+  "language": "he",
+  "title": "short PR title",
+  "summary": "what the change does and why, 2-4 lines",
+  "simplest": "estimated simplest version, labeled as an estimate",
+  "start_here": "where the flow begins and how it travels through the files",
+  "files": {
+    "path/to/file.ts": {
+      "what": "...", "why": "...", "inferred": true,
+      "names": [{"name": "processData", "verdict": "generic", "suggest": "normalizeCartItems"}],
+      "removable": "..."
+    }
+  },
+  "security_notes": "your judgement on the automated findings, false positives, blind spots",
+  "verify": ["one to three concrete things only the reviewer can check"]
+}
+```
+
+Then render and hand over the report:
+
+```
+python3 <skill-dir>/scripts/render.py --facts facts.json --explain explanations.json --out report.html
+```
+
+The output is one self-contained HTML file (score ring, relationship diagram, security table, dependency changes, every file explained in reading order, "Still yours to verify"). Tell the user where it is, open or send it if the environment allows, and also give a 5-line summary in chat (score, top risks, where to start) so they are not forced to open it. Never put invented numbers in `explanations.json`; the computed numbers come from `facts.json`.
 
 ## Modes
 

@@ -1,0 +1,379 @@
+{
+  "meta": {
+    "mode": "main...HEAD",
+    "base": "main",
+    "root": "/tmp/claude-0/-home-claude/8dabd2b4-b400-5fcc-aec1-ff66f7a36d10/scratchpad/demo",
+    "generated": "2026-11-02T19:44:41",
+    "note": "Static heuristics (regex), not an AST or a security audit. Findings are leads for a human."
+  },
+  "totals": {
+    "files": 4,
+    "added": 23,
+    "deleted": 3,
+    "source_files": 3,
+    "test_files": 0
+  },
+  "risk_summary": {
+    "red": 2,
+    "yellow": 1,
+    "green": 1
+  },
+  "score": {
+    "value": 1.0,
+    "out_of": 10,
+    "grade": "very high review risk",
+    "grade_key": "very_high",
+    "breakdown": [
+      {
+        "label": "Security: 2 high finding(s)",
+        "key": "sec_high",
+        "n": 2,
+        "delta": -4
+      },
+      {
+        "label": "Security: 2 medium finding(s)",
+        "key": "sec_med",
+        "n": 2,
+        "delta": -2
+      },
+      {
+        "label": "2 red-risk file(s)",
+        "key": "red",
+        "n": 2,
+        "delta": -2
+      },
+      {
+        "label": "2 new dependencies",
+        "key": "deps",
+        "n": 2,
+        "delta": -1.0
+      }
+    ]
+  },
+  "entry_points": [
+    "src/screens/HomeScreen.tsx"
+  ],
+  "reading_order": [
+    "src/screens/HomeScreen.tsx",
+    "src/api/client.ts",
+    "src/auth/tokenManager.ts",
+    "package.json"
+  ],
+  "files": [
+    {
+      "path": "package.json",
+      "old_path": "package.json",
+      "status": "modified",
+      "adds": 1,
+      "dels": 1,
+      "binary": false,
+      "kind": "config",
+      "imports": [],
+      "external_imports": [],
+      "imported_by": [],
+      "imports_in_change": [],
+      "imported_by_in_change": [],
+      "new_identifiers": [],
+      "findings": [],
+      "risk_points": 2,
+      "risk": "yellow",
+      "risk_reasons": [
+        "config / build / CI file"
+      ],
+      "entry_hint": null,
+      "symbol_count": 0
+    },
+    {
+      "path": "src/api/client.ts",
+      "old_path": "src/api/client.ts",
+      "status": "added",
+      "adds": 9,
+      "dels": 0,
+      "binary": false,
+      "kind": "source",
+      "imports": [
+        "src/auth/tokenManager.ts"
+      ],
+      "external_imports": [
+        "axios"
+      ],
+      "imported_by": [
+        "src/screens/HomeScreen.tsx"
+      ],
+      "imports_in_change": [
+        "src/auth/tokenManager.ts"
+      ],
+      "imported_by_in_change": [
+        "src/screens/HomeScreen.tsx"
+      ],
+      "new_identifiers": [
+        {
+          "name": "API_KEY",
+          "line": 3,
+          "smell": null
+        },
+        {
+          "name": "client",
+          "line": 4,
+          "smell": null
+        },
+        {
+          "name": "processData",
+          "line": 5,
+          "smell": null
+        },
+        {
+          "name": "t",
+          "line": 6,
+          "smell": null
+        },
+        {
+          "name": "q",
+          "line": 7,
+          "smell": null
+        }
+      ],
+      "findings": [
+        {
+          "file": "src/api/client.ts",
+          "line": 3,
+          "severity": "high",
+          "rule": "hardcoded-secret",
+          "message": "Looks like a hardcoded secret or credential",
+          "snippet": "const API_KEY = \"sk_live_abcdef1234567890\";"
+        },
+        {
+          "file": "src/api/client.ts",
+          "line": 4,
+          "severity": "medium",
+          "rule": "cleartext-http",
+          "message": "Cleartext http:// URL",
+          "snippet": "export const client = axios.create({ baseURL: 'http://api.example.com' });"
+        },
+        {
+          "file": "src/api/client.ts",
+          "line": 5,
+          "severity": "low",
+          "rule": "as-any",
+          "message": "Type safety bypassed with any",
+          "snippet": "export async function processData(data: any) {"
+        },
+        {
+          "file": "src/api/client.ts",
+          "line": 7,
+          "severity": "high",
+          "rule": "sql-concat",
+          "message": "SQL built by string concatenation (injection risk)",
+          "snippet": "const q = `SELECT * FROM users WHERE id = ${data.id}`;"
+        }
+      ],
+      "risk_points": 5,
+      "risk": "red",
+      "risk_reasons": [
+        "2 high-severity finding(s)",
+        "1 medium-severity finding(s)"
+      ],
+      "entry_hint": null,
+      "symbol_count": 5
+    },
+    {
+      "path": "src/auth/tokenManager.ts",
+      "old_path": "src/auth/tokenManager.ts",
+      "status": "added",
+      "adds": 5,
+      "dels": 0,
+      "binary": false,
+      "kind": "source",
+      "imports": [],
+      "external_imports": [
+        "@react-native-async-storage/async-storage"
+      ],
+      "imported_by": [
+        "src/api/client.ts"
+      ],
+      "imports_in_change": [],
+      "imported_by_in_change": [
+        "src/api/client.ts"
+      ],
+      "new_identifiers": [
+        {
+          "name": "tokenManager",
+          "line": 2,
+          "smell": "vague suffix"
+        }
+      ],
+      "findings": [
+        {
+          "file": "src/auth/tokenManager.ts",
+          "line": 3,
+          "severity": "medium",
+          "rule": "token-storage",
+          "message": "Sensitive value stored in unencrypted storage (consider Keychain/Keystore/SecureStore)",
+          "snippet": "async save(token: string) { await AsyncStorage.setItem('auth_token', token); },"
+        }
+      ],
+      "risk_points": 5,
+      "risk": "red",
+      "risk_reasons": [
+        "sensitive area: \"auth\" in path",
+        "1 medium-severity finding(s)"
+      ],
+      "entry_hint": null,
+      "symbol_count": 1
+    },
+    {
+      "path": "src/screens/HomeScreen.tsx",
+      "old_path": "src/screens/HomeScreen.tsx",
+      "status": "modified",
+      "adds": 8,
+      "dels": 2,
+      "binary": false,
+      "kind": "source",
+      "imports": [
+        "src/api/client.ts",
+        "src/utils/format.ts"
+      ],
+      "external_imports": [
+        "react",
+        "react-native"
+      ],
+      "imported_by": [
+        "App.tsx"
+      ],
+      "imports_in_change": [
+        "src/api/client.ts"
+      ],
+      "imported_by_in_change": [],
+      "new_identifiers": [
+        {
+          "name": "HomeScreen",
+          "line": 5,
+          "smell": null
+        }
+      ],
+      "findings": [],
+      "risk_points": 0,
+      "risk": "green",
+      "risk_reasons": [],
+      "entry_hint": null,
+      "symbol_count": 1
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "n0",
+        "path": "src/api/client.ts",
+        "changed": true,
+        "risk": "red",
+        "adds": 9,
+        "dels": 0,
+        "status": "added"
+      },
+      {
+        "id": "n1",
+        "path": "src/auth/tokenManager.ts",
+        "changed": true,
+        "risk": "red",
+        "adds": 5,
+        "dels": 0,
+        "status": "added"
+      },
+      {
+        "id": "n2",
+        "path": "src/screens/HomeScreen.tsx",
+        "changed": true,
+        "risk": "green",
+        "adds": 8,
+        "dels": 2,
+        "status": "modified"
+      },
+      {
+        "id": "n3",
+        "path": "App.tsx",
+        "changed": false,
+        "risk": null,
+        "adds": 0,
+        "dels": 0,
+        "status": "unchanged"
+      }
+    ],
+    "edges": [
+      [
+        "n0",
+        "n1",
+        "solid"
+      ],
+      [
+        "n2",
+        "n0",
+        "solid"
+      ],
+      [
+        "n3",
+        "n2",
+        "dashed"
+      ]
+    ]
+  },
+  "dependencies": {
+    "added": [
+      {
+        "name": "axios",
+        "version": "^1.7.0",
+        "section": "dependencies",
+        "file": "package.json"
+      },
+      {
+        "name": "lodash",
+        "version": "4.17.21",
+        "section": "dependencies",
+        "file": "package.json"
+      }
+    ],
+    "removed": [],
+    "changed": []
+  },
+  "security": [
+    {
+      "file": "src/api/client.ts",
+      "line": 3,
+      "severity": "high",
+      "rule": "hardcoded-secret",
+      "message": "Looks like a hardcoded secret or credential",
+      "snippet": "const API_KEY = \"sk_live_abcdef1234567890\";"
+    },
+    {
+      "file": "src/api/client.ts",
+      "line": 7,
+      "severity": "high",
+      "rule": "sql-concat",
+      "message": "SQL built by string concatenation (injection risk)",
+      "snippet": "const q = `SELECT * FROM users WHERE id = ${data.id}`;"
+    },
+    {
+      "file": "src/api/client.ts",
+      "line": 4,
+      "severity": "medium",
+      "rule": "cleartext-http",
+      "message": "Cleartext http:// URL",
+      "snippet": "export const client = axios.create({ baseURL: 'http://api.example.com' });"
+    },
+    {
+      "file": "src/auth/tokenManager.ts",
+      "line": 3,
+      "severity": "medium",
+      "rule": "token-storage",
+      "message": "Sensitive value stored in unencrypted storage (consider Keychain/Keystore/SecureStore)",
+      "snippet": "async save(token: string) { await AsyncStorage.setItem('auth_token', token); },"
+    },
+    {
+      "file": "src/api/client.ts",
+      "line": 5,
+      "severity": "low",
+      "rule": "as-any",
+      "message": "Type safety bypassed with any",
+      "snippet": "export async function processData(data: any) {"
+    }
+  ]
+}

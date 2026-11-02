@@ -1,0 +1,15 @@
+{
+ "language":"he","title":"הוספת קריאת API עם טוקן למסך הבית",
+ "summary":"המסך הראשי קורא עכשיו לשרת דרך לקוח חדש, והטוקן נשמר באחסון מקומי.\nהשינוי נוגע באימות ובתקשורת, לכן רוב הסיכון נמצא שם.",
+ "simplest":"הערכה: קריאה אחת עם fetch וטוקן שמגיע מבחוץ, בערך 15 שורות. כאן יש שכבת tokenManager ולקוח axios נפרד שלא נדרשו כדי להציג נתון אחד.",
+ "start_here":"הכול מתחיל ב-HomeScreen, שנטען מ-App.tsx. הוא קורא ל-processData ב-client.ts, שמבקש טוקן מ-tokenManager ושולח את הבקשה.",
+ "files":{
+  "src/api/client.ts":{"what":"לקוח HTTP חדש עם פונקציה אחת שבונה שאילתה ושולחת POST.","why":"כדי שהמסך יקבל נתונים מהשרת.","inferred":true,
+    "names":[{"name":"processData","verdict":"שם גנרי, לא אומר מה נעשה","suggest":"fetchUserReport"},{"name":"q","verdict":"שם של אות אחת למשהו שהוא SQL","suggest":"userQuery"}],
+    "removable":"השאילתה q לא אמורה להישלח מהלקוח בכלל."},
+  "src/auth/tokenManager.ts":{"what":"שומר וקורא טוקן מ-AsyncStorage.","why":"כדי לשמור התחברות בין הפעלות.","inferred":true},
+  "src/screens/HomeScreen.tsx":{"what":"המסך קורא ל-API ב-useEffect ומציג את התשובה כ-JSON.","why":"להציג נתון חי."}
+ },
+ "security_notes":"מפתח API קשיח ושאילתת SQL שנבנית בשרשור הם ממצאים אמיתיים בקוד הזה. הסורק לא רואה מה השרת עושה עם הבקשה.",
+ "verify":["להריץ את האפליקציה ולבדוק שהטוקן נמחק בהתנתקות.","לוודא ששום מפתח אמיתי לא נכנס להיסטוריית git.","לבדוק מה קורה כשהשרת מחזיר 401."]
+}
