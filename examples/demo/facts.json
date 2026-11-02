@@ -2,21 +2,21 @@
   "meta": {
     "mode": "main...HEAD",
     "base": "main",
-    "root": "/tmp/claude-0/-home-claude/8dabd2b4-b400-5fcc-aec1-ff66f7a36d10/scratchpad/demo",
-    "generated": "2026-11-02T19:44:41",
+    "root": "/tmp/claude-0/-home-claude/8dabd2b4-b400-5fcc-aec1-ff66f7a36d10/scratchpad/demo2",
+    "generated": "2026-11-02T20:32:01",
     "note": "Static heuristics (regex), not an AST or a security audit. Findings are leads for a human."
   },
   "totals": {
-    "files": 4,
-    "added": 23,
+    "files": 6,
+    "added": 42,
     "deleted": 3,
     "source_files": 3,
     "test_files": 0
   },
   "risk_summary": {
     "red": 2,
-    "yellow": 1,
-    "green": 1
+    "yellow": 2,
+    "green": 2
   },
   "score": {
     "value": 1.0,
@@ -57,9 +57,52 @@
     "src/screens/HomeScreen.tsx",
     "src/api/client.ts",
     "src/auth/tokenManager.ts",
-    "package.json"
+    "package.json",
+    "tsconfig.json",
+    "explanations.json"
   ],
   "files": [
+    {
+      "path": "explanations.json",
+      "old_path": "explanations.json",
+      "status": "added",
+      "adds": 15,
+      "dels": 0,
+      "binary": false,
+      "kind": "other",
+      "imports": [],
+      "external_imports": [],
+      "imported_by": [],
+      "imports_in_change": [],
+      "imported_by_in_change": [],
+      "new_identifiers": [],
+      "findings": [],
+      "risk_points": 0,
+      "risk": "green",
+      "risk_reasons": [],
+      "entry_hint": null,
+      "symbol_count": 0,
+      "unresolved_imports": [],
+      "diff": [
+        "@@ -0,0 +1,15 @@",
+        "+{",
+        "+ \"language\":\"he\",\"title\":\"הוספת קריאת API עם טוקן למסך הבית\",",
+        "+ \"summary\":\"המסך הראשי קורא עכשיו לשרת דרך לקוח חדש, והטוקן נשמר באחסון מקומי.\\nהשינוי נוגע באימות ובתקשורת, לכן רוב הסיכון נמצא שם.\",",
+        "+ \"simplest\":\"הערכה: קריאה אחת עם fetch וטוקן שמגיע מבחוץ, בערך 15 שורות. כאן יש שכבת tokenManager ולקוח axios נפרד שלא נדרשו כדי להציג נתון אחד.\",",
+        "+ \"start_here\":\"הכול מתחיל ב-HomeScreen, שנטען מ-App.tsx. הוא קורא ל-processData ב-client.ts, שמבקש טוקן מ-tokenManager ושולח את הבקשה.\",",
+        "+ \"files\":{",
+        "+  \"src/api/client.ts\":{\"what\":\"לקוח HTTP חדש עם פונקציה אחת שבונה שאילתה ושולחת POST.\",\"why\":\"כדי שהמסך יקבל נתונים מהשרת.\",\"inferred\":true,",
+        "+    \"names\":[{\"name\":\"processData\",\"verdict\":\"שם גנרי, לא אומר מה נעשה\",\"suggest\":\"fetchUserReport\"},{\"name\":\"q\",\"verdict\":\"שם של אות אחת למשהו שהוא SQL\",\"suggest\":\"userQuery\"}],",
+        "+    \"removable\":\"השאילתה q לא אמורה להישלח מהלקוח בכלל.\"},",
+        "+  \"src/auth/tokenManager.ts\":{\"what\":\"שומר וקורא טוקן מ-AsyncStorage.\",\"why\":\"כדי לשמור התחברות בין הפעלות.\",\"inferred\":true},",
+        "+  \"src/screens/HomeScreen.tsx\":{\"what\":\"המסך קורא ל-API ב-useEffect ומציג את התשובה כ-JSON.\",\"why\":\"להציג נתון חי.\"}",
+        "+ },",
+        "+ \"security_notes\":\"מפתח API קשיח ושאילתת SQL שנבנית בשרשור הם ממצאים אמיתיים בקוד הזה. הסורק לא רואה מה השרת עושה עם הבקשה.\",",
+        "+ \"verify\":[\"להריץ את האפליקציה ולבדוק שהטוקן נמחק בהתנתקות.\",\"לוודא ששום מפתח אמיתי לא נכנס להיסטוריית git.\",\"לבדוק מה קורה כשהשרת מחזיר 401.\"]",
+        "+}"
+      ],
+      "diff_truncated": 0
+    },
     {
       "path": "package.json",
       "old_path": "package.json",
@@ -81,7 +124,14 @@
         "config / build / CI file"
       ],
       "entry_hint": null,
-      "symbol_count": 0
+      "symbol_count": 0,
+      "unresolved_imports": [],
+      "diff": [
+        "@@ -1 +1 @@",
+        "-{\"name\":\"demo\",\"version\":\"1.0.0\",\"dependencies\":{\"react\":\"18.2.0\",\"react-native\":\"0.74.0\"}}",
+        "+{\"name\":\"demo\",\"version\":\"1.0.0\",\"dependencies\":{\"react\":\"18.2.0\",\"react-native\":\"0.74.0\",\"axios\":\"^1.7.0\",\"lodash\":\"4.17.21\"}}"
+      ],
+      "diff_truncated": 0
     },
     {
       "path": "src/api/client.ts",
@@ -174,7 +224,21 @@
         "1 medium-severity finding(s)"
       ],
       "entry_hint": null,
-      "symbol_count": 5
+      "symbol_count": 5,
+      "unresolved_imports": [],
+      "diff": [
+        "@@ -0,0 +1,9 @@",
+        "+import axios from 'axios';",
+        "+import { tokenManager } from '@auth/tokenManager';",
+        "+const API_KEY = \"sk_live_abcdef1234567890\";",
+        "+export const client = axios.create({ baseURL: 'http://api.example.com' });",
+        "+export async function processData(data: any) {",
+        "+  const t = await tokenManager.getToken();",
+        "+  const q = `SELECT * FROM users WHERE id = ${data.id}`;",
+        "+  return client.post('/x', { data, q }, { headers: { Authorization: t } });",
+        "+}"
+      ],
+      "diff_truncated": 0
     },
     {
       "path": "src/auth/tokenManager.ts",
@@ -185,9 +249,7 @@
       "binary": false,
       "kind": "source",
       "imports": [],
-      "external_imports": [
-        "@react-native-async-storage/async-storage"
-      ],
+      "external_imports": [],
       "imported_by": [
         "src/api/client.ts"
       ],
@@ -219,7 +281,19 @@
         "1 medium-severity finding(s)"
       ],
       "entry_hint": null,
-      "symbol_count": 1
+      "symbol_count": 1,
+      "unresolved_imports": [
+        "@react-native-async-storage/async-storage"
+      ],
+      "diff": [
+        "@@ -0,0 +1,5 @@",
+        "+import AsyncStorage from '@react-native-async-storage/async-storage';",
+        "+export const tokenManager = {",
+        "+  async save(token: string) { await AsyncStorage.setItem('auth_token', token); },",
+        "+  async getToken() { return AsyncStorage.getItem('auth_token'); },",
+        "+};"
+      ],
+      "diff_truncated": 0
     },
     {
       "path": "src/screens/HomeScreen.tsx",
@@ -256,7 +330,55 @@
       "risk": "green",
       "risk_reasons": [],
       "entry_hint": null,
-      "symbol_count": 1
+      "symbol_count": 1,
+      "unresolved_imports": [],
+      "diff": [
+        "@@ -1,3 +1,9 @@",
+        "-import React from 'react';",
+        "+import React, { useEffect, useState } from 'react';",
+        " import { Text } from 'react-native';",
+        "-export const HomeScreen = () => <Text>Hi</Text>;",
+        "+import { processData } from '@api/client';",
+        "+import { fmt } from '~/utils/format';",
+        "+export const HomeScreen = () => {",
+        "+  const [r, setR] = useState<any>(null);",
+        "+  useEffect(() => { processData({ id: 1 }).then(setR); }, []);",
+        "+  return <Text>{fmt(1)} {JSON.stringify(r)}</Text>;",
+        "+};"
+      ],
+      "diff_truncated": 0
+    },
+    {
+      "path": "tsconfig.json",
+      "old_path": "tsconfig.json",
+      "status": "added",
+      "adds": 4,
+      "dels": 0,
+      "binary": false,
+      "kind": "config",
+      "imports": [],
+      "external_imports": [],
+      "imported_by": [],
+      "imports_in_change": [],
+      "imported_by_in_change": [],
+      "new_identifiers": [],
+      "findings": [],
+      "risk_points": 2,
+      "risk": "yellow",
+      "risk_reasons": [
+        "config / build / CI file"
+      ],
+      "entry_hint": null,
+      "symbol_count": 0,
+      "unresolved_imports": [],
+      "diff": [
+        "@@ -0,0 +1,4 @@",
+        "+{",
+        "+  // comment",
+        "+  \"compilerOptions\": { \"baseUrl\": \".\", \"paths\": { \"@api/*\": [\"src/api/*\"], \"@auth/*\": [\"src/auth/*\"], }, },",
+        "+}"
+      ],
+      "diff_truncated": 0
     }
   ],
   "graph": {
@@ -314,6 +436,11 @@
         "n2",
         "dashed"
       ]
+    ],
+    "solid_edges": 2,
+    "unresolved_total": 1,
+    "unresolved_examples": [
+      "@react-native-async-storage/async-storage"
     ]
   },
   "dependencies": {

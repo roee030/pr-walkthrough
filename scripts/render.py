@@ -35,7 +35,7 @@ L = {
         'added': 'added', 'removed': 'removed', 'changed': 'version changed', 'none': 'none',
         'legend': 'Solid = import between changed files. Dashed = unchanged file that imports a changed one (blast radius).',
         'files_word': 'files', 'entry': 'Entry points of this change', 'reason': 'Why this level',
-        'method': 'Method', 'notes': 'Reviewer notes',
+        'method': 'Method', 'notes': 'Reviewer notes', 'libs': 'Libraries used', 'show_code': 'Show the code', 'more_lines': 'more lines not shown', 'lock_hidden': 'Lockfile: diff hidden.', 'no_edges': 'No import links between the changed files were found.', 'unres': 'Imports that could not be resolved (path alias not detected?)',
         'grades': {'low': 'low review risk', 'moderate': 'moderate review risk', 'high': 'high review risk', 'very_high': 'very high review risk'},
         'bd': {'size': '{n} changed lines', 'sec_high': 'Security: {n} high finding(s)', 'sec_med': 'Security: {n} medium finding(s)',
                'red': '{n} red-risk file(s)', 'deps': '{n} new dependencies', 'no_tests': 'No tests changed alongside {n} source lines',
@@ -53,7 +53,7 @@ L = {
         'added': 'נוספו', 'removed': 'הוסרו', 'changed': 'גרסה השתנתה', 'none': 'אין',
         'legend': 'קו רציף = ייבוא בין קבצים ששונו. קו מקווקו = קובץ שלא שונה אבל מייבא קובץ ששונה (רדיוס פגיעה).',
         'files_word': 'קבצים', 'entry': 'נקודות כניסה של השינוי', 'reason': 'למה הדרגה הזו',
-        'method': 'שיטה', 'notes': 'הערות סוקר',
+        'method': 'שיטה', 'notes': 'הערות סוקר', 'libs': 'ספריות בשימוש', 'show_code': 'הצג את הקוד', 'more_lines': 'שורות נוספות לא מוצגות', 'lock_hidden': 'קובץ lock: ההפרש מוסתר.', 'no_edges': 'לא נמצאו קשרי ייבוא בין הקבצים ששונו.', 'unres': 'ייבואים שלא נפתרו (אולי alias של נתיב שלא זוהה?)',
         'p_red': 'אדום', 'p_yellow': 'צהוב', 'p_green': 'ירוק', 'grades': {'low': 'סיכון סקירה נמוך', 'moderate': 'סיכון סקירה בינוני', 'high': 'סיכון סקירה גבוה', 'very_high': 'סיכון סקירה גבוה מאוד'},
         'bd': {'size': '{n} שורות ששונו', 'sec_high': 'אבטחה: {n} ממצאים חמורים', 'sec_med': 'אבטחה: {n} ממצאים בינוניים',
                'red': '{n} קבצים בסיכון אדום', 'deps': '{n} תלויות חדשות', 'no_tests': 'לא שונו טסטים לצד {n} שורות קוד',
@@ -62,6 +62,29 @@ L = {
         'disclaimer': 'היוריסטיקות סטטיות (regex), לא AST ולא ביקורת אבטחה. הציון מודד כמה מסוכן לסקור את השינוי, לא אם הקוד נכון.',
     },
 }
+
+HE_RULES = {
+    'hardcoded-secret': 'נראה כמו סיסמה או מפתח סודי שכתוב ישר בקוד',
+    'aws-key': 'נראה כמו מפתח גישה של AWS', 'github-token': 'נראה כמו טוקן של GitHub', 'private-key': 'מפתח פרטי נשמר בקוד',
+    'eval': 'הרצת קוד דינמית (eval), מסוכן', 'xss-html': 'הזרקת HTML גולמי, סיכון XSS',
+    'shell-exec': 'פקודת מערכת שנבנית מקלט דינמי', 'sql-concat': 'שאילתת SQL שנבנית משרשור טקסט, סיכון להזרקה',
+    'tls-off': 'בדיקת אישור TLS כבויה', 'pickle': 'פענוח נתונים לא בטוח',
+    'cleartext-http': 'כתובת http לא מוצפנת', 'token-storage': 'טוקן או סיסמה באחסון לא מוצפן (עדיף Keychain/Keystore)',
+    'log-secret': 'ייתכן שסוד נכתב ללוג', 'cors-any': 'CORS מאפשר כל מקור',
+    'webview-open': 'WebView עם הרשאות רחבות', 'open-url': 'openURL עם משתנה, כדאי לאמת כתובת',
+    'android-cleartext': 'תעבורה לא מוצפנת מותרת ברמת המערכת', 'new-permission': 'הרשאה חדשה במערכת ההפעלה',
+    'ts-ignore': 'בדיקת טיפוסים או lint הושתקה', 'as-any': 'עקיפת טיפוסים עם any',
+}
+SEV_HE = {'high': 'חמור', 'medium': 'בינוני', 'low': 'נמוך'}
+
+
+def rule_msg(x, lang):
+    return HE_RULES.get(x['rule'], x['message']) if lang == 'he' else x['message']
+
+
+def sev_word(s, lang):
+    return SEV_HE.get(s, s) if lang == 'he' else s
+
 
 CSS = """
 :root{--bg:#f7f7f5;--card:#fff;--ink:#1a1a1a;--mute:#6b6b66;--line:#e4e4df;--accent:#2b5fd9;
@@ -107,6 +130,16 @@ ul{margin:6px 0;padding-inline-start:22px}
 .method{font-size:.82rem;color:var(--mute);margin-top:28px;border-top:1px solid var(--line);padding-top:12px}
 .tag{font-size:.72rem;border:1px solid var(--line);border-radius:6px;padding:0 6px;color:var(--mute)}
 @media (max-width:600px){.hero{gap:14px}}
+.tldr{font-size:1.08rem;line-height:1.6;margin:10px 0 4px;font-weight:500}
+.rel{margin-top:10px;line-height:1.9}
+.codebox{margin-top:12px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.codebox summary{cursor:pointer;padding:8px 12px;font-weight:600;font-size:.9rem;background:var(--code);user-select:none}
+pre.code{margin:0;padding:8px 0;overflow-x:auto;max-height:560px;overflow-y:auto;font-size:.82rem;line-height:1.5;background:var(--card)}
+pre.code code{background:none;padding:0;white-space:pre;overflow-wrap:normal;display:block;min-width:max-content}
+.ln{display:block;padding:0 12px;white-space:pre}
+.ln.add{background:var(--greenbg);color:var(--green)}
+.ln.del{background:var(--redbg);color:var(--red)}
+.ln.hunk{color:var(--mute);background:var(--code)}
 .dg-narrow{display:none}
 @media (max-width:640px){.dg-wide{display:none}.dg-narrow{display:block}}
 """
@@ -273,6 +306,12 @@ def main():
         out.append(f'<h2>{e(t["diagram"])}</h2><div class="diagram dg-wide" dir="ltr">{svg_diagram(facts["graph"], avail=940, uid="w")}</div>'
                    f'<div class="diagram dg-narrow" dir="ltr">{svg_diagram(facts["graph"], avail=380, uid="n", lr_limit=0)}</div>'
                    f'<div class="meta" style="margin-top:6px">{e(t["legend"])}</div>')
+        g = facts['graph']
+        if not g.get('solid_edges'):
+            msg = e(t['no_edges'])
+            if g.get('unresolved_total'):
+                msg += f' {e(t["unres"])}: ' + ' '.join(f'<code>{e(q)}</code>' for q in g.get('unresolved_examples', []))
+            out.append(f'<div class="card meta">{msg}</div>')
 
     # security
     out.append(f'<h2>{e(t["security"])}</h2><div class="card">')
@@ -280,8 +319,8 @@ def main():
     if sec:
         out.append(f'<table><tr><th>{e(t["cols"][0])}</th><th>{e(t["cols"][1])}</th><th>{e(t["cols"][2])}</th><th>{e(t["cols"][3])}</th></tr>')
         for x in sec:
-            out.append(f'<tr><td class="sev {x["severity"]}">{e(x["severity"])}</td>'
-                       f'<td><code>{e(x["file"])}:{x["line"]}</code></td><td>{e(x["message"])}</td>'
+            out.append(f'<tr><td class="sev {x["severity"]}">{e(sev_word(x["severity"], lang))}</td>'
+                       f'<td><code>{e(x["file"])}:{x["line"]}</code></td><td>{e(rule_msg(x, lang))}</td>'
                        f'<td><code>{e(x["snippet"])}</code></td></tr>')
         out.append('</table>')
     else:
@@ -313,22 +352,16 @@ def main():
         out.append(f'<div class="fhead"><span class="dot {f["risk"]}"></span><span class="mono meta">{i}</span>'
                    f'<span class="path mono">{e(p)}</span><span class="tag">{e(f["status"])}</span><span class="tag">{e(f["kind"])}</span>'
                    f'<span class="meta mono">+{f["adds"]} −{f["dels"]}</span></div>')
-        if f['risk_reasons']:
-            out.append(f'<div class="meta">{e(t["reason"])}: {e(" · ".join(f["risk_reasons"]))}</div>')
-        if f.get('entry_hint'):
-            out.append(f'<div class="meta">↳ {e(f["entry_hint"])}</div>')
-        if f['imports_in_change']:
-            out.append(f'<div class="kv"><b>{e(t["imports"])}</b>' + ' '.join(f'<code>{e(q)}</code>' for q in f['imports_in_change']) + '</div>')
-        if f['imported_by']:
-            shown = f['imported_by'][:6]
-            more = f' +{len(f["imported_by"]) - 6}' if len(f['imported_by']) > 6 else ''
-            out.append(f'<div class="kv"><b>{e(t["by"])}</b>' + ' '.join(f'<code>{e(q)}</code>' for q in shown) + e(more) + '</div>')
-        if x:
-            if x.get('what'):
-                out.append(f'<div class="kv"><b>{e(t["what"])}</b>{para(x["what"])}</div>')
-            if x.get('why'):
-                tag = f' <span class="tag">{e(t["inferred"])}</span>' if x.get('inferred') else ''
-                out.append(f'<div class="kv"><b>{e(t["why"])}{tag}</b>{para(x["why"])}</div>')
+        tldr = x.get('tldr') or x.get('what')
+        if tldr:
+            out.append(f'<p class="tldr">{e(tldr)}</p>')
+        elif f['kind'] not in ('lock', 'docs', 'asset'):
+            out.append(f'<p class="meta" style="margin-top:8px">{e(t["noexp"])}</p>')
+        if x.get('tldr') and x.get('what'):
+            out.append(f'<div class="kv"><b>{e(t["what"])}</b>{para(x["what"])}</div>')
+        if x.get('why'):
+            tag = f' <span class="tag">{e(t["inferred"])}</span>' if x.get('inferred') else ''
+            out.append(f'<div class="kv"><b>{e(t["why"])}{tag}</b>{para(x["why"])}</div>')
         names = x.get('names') or [
             {'name': n['name'], 'verdict': t['smell'].get(n['smell'], n['smell']), 'suggest': ''} for n in f['new_identifiers'] if n['smell']]
         if names:
@@ -340,12 +373,33 @@ def main():
         if x.get('removable'):
             out.append(f'<div class="kv"><b>{e(t["remove"])}</b>{para(x["removable"])}</div>')
         for fi in f['findings']:
-            out.append(f'<div class="meta" style="margin-top:8px"><span class="sev {fi["severity"]}">{e(fi["severity"])}</span> '
-                       f'<code>:{fi["line"]}</code> {e(fi["message"])}</div>')
-        if not x and not f['risk_reasons'] and f['kind'] in ('lock', 'docs', 'asset'):
-            pass
-        elif not x:
-            out.append(f'<div class="meta" style="margin-top:8px">{e(t["noexp"])}</div>')
+            out.append(f'<div class="meta" style="margin-top:8px"><span class="sev {fi["severity"]}">{e(sev_word(fi["severity"], lang))}</span> '
+                       f'<code>:{fi["line"]}</code> {e(rule_msg(fi, lang))}</div>')
+        rel = []
+        if f['imports_in_change']:
+            rel.append(f'{e(t["imports"])}: ' + ' '.join(f'<code>{e(q)}</code>' for q in f['imports_in_change']))
+        if f['imported_by']:
+            more = f' +{len(f["imported_by"]) - 5}' if len(f['imported_by']) > 5 else ''
+            rel.append(f'{e(t["by"])}: ' + ' '.join(f'<code>{e(q)}</code>' for q in f['imported_by'][:5]) + e(more))
+        if f.get('external_imports'):
+            rel.append(f'{e(t["libs"])}: ' + ' '.join(f'<code>{e(q)}</code>' for q in f['external_imports'][:8]))
+        if f['risk_reasons']:
+            rel.append(f'{e(t["reason"])}: {e(" · ".join(f["risk_reasons"]))}')
+        if f.get('entry_hint'):
+            rel.append(f'↳ {e(f["entry_hint"])}')
+        if rel:
+            out.append('<div class="rel meta">' + '<br>'.join(rel) + '</div>')
+        # code, collapsed by default
+        if f.get('diff'):
+            body = []
+            for ln in f['diff']:
+                cls = 'add' if ln.startswith('+') else 'del' if ln.startswith('-') else 'hunk' if ln.startswith('@@') else ''
+                body.append(f'<span class="ln {cls}">{e(ln) if ln else " "}</span>')
+            more = f'<span class="ln hunk">… +{f["diff_truncated"]} {e(t["more_lines"])}</span>' if f.get('diff_truncated') else ''
+            out.append(f'<details class="codebox"><summary>{e(t["show_code"])} <span class="mono meta">+{f["adds"]} −{f["dels"]}</span></summary>'
+                       f'<pre class="code" dir="ltr"><code>{"".join(body)}{more}</code></pre></details>')
+        elif f.get('kind') == 'lock':
+            out.append(f'<div class="meta" style="margin-top:8px">{e(t["lock_hidden"])}</div>')
         out.append('</div>')
 
     if ex.get('verify'):

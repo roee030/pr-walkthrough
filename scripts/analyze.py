@@ -110,11 +110,11 @@ def pick_base(root, requested):
     return 'HEAD~1'
 
 
-def get_diff(args, root):
+def get_diff(args, root, ctx=0):
     if args.diff_file:
         with open(args.diff_file, encoding='utf-8', errors='replace') as f:
             return f.read(), 'patch-file', None
-    flags = ['--no-color', '--no-ext-diff', '-U0', '--find-renames']
+    flags = ['--no-color', '--no-ext-diff', f'-U{ctx}', '--find-renames']
     if args.staged:
         return run(['git', 'diff', '--cached'] + flags, root) or '', 'staged', 'HEAD'
     if args.worktree:
@@ -175,6 +175,28 @@ def parse_diff(text):
     return files
 
 
+MAX_DIFF_LINES = 300
+
+
+def split_blocks(text):
+    blocks, cur, in_hunk = {}, None, False
+    for raw in text.splitlines():
+        if raw.startswith('diff --git '):
+            m = re.match(r'diff --git a/(.*?) b/(.*)$', raw)
+            cur = []
+            in_hunk = False
+            if m:
+                blocks[m.group(2)] = cur
+            continue
+        if cur is None:
+            continue
+        if raw.startswith('@@'):
+            in_hunk = True
+        if in_hunk or raw.startswith('Binary files'):
+            cur.append(raw)
+    return blocks
+
+
 def kind_of(path):
     if TEST_RE.search(path):
         return 'test'
@@ -232,8 +254,80 @@ def extract_imports(path, text):
     return out
 
 
+CTX = {'aliases': [], 'base_url': '', 'deps': set(), 'stems': {}}
+ASSET_SPEC_RE = re.compile(r'\.(png|jpe?g|gif|svg|webp|ttf|otf|json|css|scss|less|mp[34]|wav|lottie)$', re.I)
+
+
+def load_json_loose(path):
+    try:
+        with open(path, encoding='utf-8', errors='replace') as fh:
+            txt = fh.read()
+    except OSError:
+        return None
+    txt = re.sub(r'^\s*//.*$', '', txt, flags=re.M)
+    txt = re.sub(r'/\*.*?\*/', '', txt, flags=re.S)
+    txt = re.sub(r',(\s*[}\]])', r'\1', txt)
+    try:
+        return json.loads(txt)
+    except ValueError:
+        return None
+
+
+def load_context(root, fileset):
+    aliases, base_url = [], ''
+    for name in ('tsconfig.json', 'tsconfig.base.json', 'jsconfig.json'):
+        j = load_json_loose(os.path.join(root, name))
+        if not isinstance(j, dict):
+            continue
+        co = j.get('compilerOptions') or {}
+        bu = co.get('baseUrl')
+        if bu:
+            b = os.path.normpath(bu).replace('\\', '/')
+            base_url = '' if b == '.' else b
+        for pat, targets in (co.get('paths') or {}).items():
+            aliases.append((pat, [os.path.normpath(os.path.join(bu or '.', t)).replace('\\', '/') for t in targets]))
+    for name in ('babel.config.js', 'babel.config.json', '.babelrc', '.babelrc.js'):
+        try:
+            with open(os.path.join(root, name), encoding='utf-8', errors='replace') as fh:
+                txt = fh.read()
+        except OSError:
+            continue
+        if 'module-resolver' in txt:
+            for k, v in re.findall(r"""['"]([@~#\w/.-]+)['"]\s*:\s*['"]\.{1,2}/?([^'"]*)['"]""", txt):
+                tgt = os.path.normpath(v or '.').replace('\\', '/')
+                aliases.append((k + '/*', [tgt + '/*']))
+                aliases.append((k, [tgt]))
+    deps = set()
+    pkgs = (run(['git', 'ls-files', '*package.json'], root) or 'package.json').splitlines()
+    for pj in pkgs[:60]:
+        j = load_json_loose(os.path.join(root, pj))
+        if isinstance(j, dict):
+            for sec in ('dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'):
+                deps.update((j.get(sec) or {}).keys())
+            if j.get('name'):
+                deps.add(j['name'])
+    stems = {}
+    for f in fileset:
+        st = os.path.splitext(f)[0]
+        stems[st] = f
+        if os.path.basename(st) == 'index':
+            stems.setdefault(os.path.dirname(st), f)
+    CTX.update({'aliases': aliases, 'base_url': base_url, 'deps': deps, 'stems': stems})
+
+
+def try_stem(stem, fileset):
+    stem = stem.replace('\\', '/')
+    cands = [stem] + [stem + e for e in JS_EXT] + [stem + '/index' + e for e in JS_EXT]
+    m = re.match(r'(.*)\.(m?jsx?|cjs)$', stem)  # ESM-style "./x.js" that points at x.ts
+    if m:
+        cands += [m.group(1) + e for e in JS_EXT]
+    for c in cands:
+        if c in fileset:
+            return c
+    return None
+
+
 def resolve(spec, from_path, fileset, is_py):
-    cands = []
     if is_py:
         if spec.startswith('.'):
             dots = len(spec) - len(spec.lstrip('.'))
@@ -244,20 +338,45 @@ def resolve(spec, from_path, fileset, is_py):
             stem = os.path.join(base, rest) if rest else base
         else:
             stem = spec.replace('.', '/')
-        cands = [stem + '.py', stem + '/__init__.py']
-    else:
-        if spec.startswith('.'):
-            stem = os.path.normpath(os.path.join(os.path.dirname(from_path), spec))
-        elif spec.startswith(('@/', '~/')):
-            stem = os.path.normpath(os.path.join('src', spec[2:]))
-        else:
-            return None
-        stem = stem.replace('\\', '/')
-        cands = [stem] + [stem + e for e in JS_EXT] + [stem + '/index' + e for e in JS_EXT]
-    for c in cands:
-        c = c.replace('\\', '/')
-        if c in fileset:
-            return c
+        for c in (stem + '.py', stem + '/__init__.py'):
+            c = c.replace('\\', '/')
+            if c in fileset:
+                return c
+        return None
+    if spec.startswith('.'):
+        return try_stem(os.path.normpath(os.path.join(os.path.dirname(from_path), spec)), fileset)
+    for pat, targets in CTX['aliases']:
+        if pat.endswith('*'):
+            pre = pat[:-1]
+            if spec.startswith(pre):
+                rest = spec[len(pre):]
+                for t in targets:
+                    r = try_stem(t.replace('*', rest), fileset)
+                    if r:
+                        return r
+        elif spec == pat:
+            for t in targets:
+                r = try_stem(t, fileset)
+                if r:
+                    return r
+    if spec.startswith(('@/', '~/', '#/')):
+        for pre in ('src', 'app', ''):
+            r = try_stem(os.path.join(pre, spec[2:]), fileset)
+            if r:
+                return r
+    if package_name(spec) in CTX['deps']:
+        return None
+    bu = CTX['base_url']
+    r = try_stem(os.path.join(bu, spec), fileset) if bu else None
+    if r:
+        return r
+    if spec[0] in '@~#':  # alias-looking, config not found: unique suffix match, at least 2 path segments
+        parts = spec.lstrip('@~#/').split('/')
+        for k in range(len(parts) - 1):
+            t = '/'.join(parts[k:])
+            hits = [f for s, f in CTX['stems'].items() if s == t or s.endswith('/' + t)]
+            if len(hits) == 1:
+                return hits[0]
     return None
 
 
@@ -363,6 +482,8 @@ def main():
 
     root = repo_root()
     diff_text, mode, base = get_diff(args, root)
+    disp_text, _m, _b = get_diff(args, root, 3)
+    blocks = split_blocks(disp_text or diff_text)
     files = parse_diff(diff_text)
     if not files:
         print('No changes found. Try --base <ref>, --staged, --worktree or --diff-file.', file=sys.stderr)
@@ -380,6 +501,8 @@ def main():
     reverse = collections.defaultdict(set)
     external = collections.defaultdict(set)
     forward = {}
+    load_context(root, fileset)
+    unresolved = collections.defaultdict(set)
     for rel in sorted(fileset):
         txt = read_file(root, rel)
         if txt is None:
@@ -391,8 +514,11 @@ def main():
             if tgt and tgt != rel:
                 outs.append(tgt)
                 reverse[tgt].add(rel)
-            elif not spec.startswith('.') and not is_py:
-                external[rel].add(package_name(spec))
+            elif not is_py and not ASSET_SPEC_RE.search(spec):
+                if spec.startswith('.') or (spec[0] in '~#@' and package_name(spec) not in CTX['deps']):
+                    unresolved[rel].add(spec)
+                else:
+                    external[rel].add(package_name(spec))
         forward[rel] = outs
 
     # per-file facts
@@ -462,6 +588,12 @@ def main():
         else:
             f['entry_hint'] = None
         f['symbol_count'] = len(f['new_identifiers'])
+        f['unresolved_imports'] = sorted(unresolved.get(p, []))[:8]
+        dl = blocks.get(p, [])
+        if f['kind'] == 'lock':
+            f['diff'], f['diff_truncated'] = [], len(dl)
+        else:
+            f['diff'], f['diff_truncated'] = dl[:MAX_DIFF_LINES], max(0, len(dl) - MAX_DIFF_LINES)
         del f['added_lines']  # keep facts.json small
 
     by_path = {f['path']: f for f in files}
@@ -569,7 +701,10 @@ def main():
         'entry_points': entry_points,
         'reading_order': order,
         'files': files,
-        'graph': {'nodes': nodes, 'edges': edges},
+        'graph': {'nodes': nodes, 'edges': edges,
+                  'solid_edges': sum(1 for x in edges if x[2] == 'solid'),
+                  'unresolved_total': sum(len(v) for v in unresolved.values() if v),
+                  'unresolved_examples': sorted({s for p in changed_paths for s in unresolved.get(p, [])})[:6]},
         'dependencies': {'added': add_deps, 'removed': rem_deps, 'changed': chg_deps},
         'security': sorted(security, key=lambda x: {'high': 0, 'medium': 1, 'low': 2}[x['severity']]),
     }

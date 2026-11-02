@@ -63,6 +63,15 @@ Group all Green chunks into one line each, or one combined line. Don't narrate t
 
 ## Step 5: Write explanations.json and render the report
 
+**Explain at eye level.** The reader is a smart colleague who did not write or read this code. Write the way you would say it out loud at the coffee machine:
+- Every file gets a `tldr`: one plain sentence (two at most) saying what the file does *for the app or the user*, not how it is built. "The home screen asks the server for data when it opens and shows the answer", not "Implements a useEffect hook that dispatches an async fetch".
+- No jargon the reader would have to look up, no stacked clauses, no restating the file name. If a technical term is unavoidable, use it once and say what it means.
+- `summary` is two or three of those same plain sentences. Put the single biggest risk in the second one.
+- Keep `why`, `names` and `removable` short, and leave them out when you have nothing concrete to say. Empty sections are better than padded ones.
+- Never invent intent: if you are guessing why something exists, set `inferred: true`.
+
+The report already shows each file's code in a collapsed block under its explanation, so do not paste code into the explanations.
+
 After reading the code, write `explanations.json` (all keys optional; write it in the user's language, identifiers in English):
 
 ```json
@@ -74,7 +83,8 @@ After reading the code, write `explanations.json` (all keys optional; write it i
   "start_here": "where the flow begins and how it travels through the files",
   "files": {
     "path/to/file.ts": {
-      "what": "...", "why": "...", "inferred": true,
+      "tldr": "ONE plain sentence: what this file does for the app",
+      "why": "...", "inferred": true,
       "names": [{"name": "processData", "verdict": "generic", "suggest": "normalizeCartItems"}],
       "removable": "..."
     }
