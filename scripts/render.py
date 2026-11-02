@@ -101,12 +101,14 @@ th{color:var(--mute);font-weight:600;font-size:.8rem;text-transform:uppercase;le
 .meta{color:var(--mute);font-size:.82rem}
 .kv{margin:8px 0 0}
 .kv b{display:block;font-size:.78rem;color:var(--mute);text-transform:uppercase;letter-spacing:.03em;margin-top:10px}
-.diagram{overflow-x:auto;max-width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.diagram{overflow:hidden;max-width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
 .mermaid{text-align:center}
 ul{margin:6px 0;padding-inline-start:22px}
 .method{font-size:.82rem;color:var(--mute);margin-top:28px;border-top:1px solid var(--line);padding-top:12px}
 .tag{font-size:.72rem;border:1px solid var(--line);border-radius:6px;padding:0 6px;color:var(--mute)}
 @media (max-width:600px){.hero{gap:14px}}
+.dg-narrow{display:none}
+@media (max-width:640px){.dg-wide{display:none}.dg-narrow{display:block}}
 """
 
 
@@ -114,9 +116,16 @@ def e(x):
     return html.escape(str(x), quote=True)
 
 
-def svg_diagram(graph):
-    nodes, edges = graph['nodes'], graph['edges']
-    by = {n['id']: n for n in nodes}
+def svg_diagram(graph, max_nodes=40, avail=940, uid='w', lr_limit=1340):
+    nodes, edges = list(graph['nodes']), list(graph['edges'])
+    hidden = 0
+    if len(nodes) > max_nodes:
+        order = {'red': 0, 'yellow': 1, 'green': 2}
+        keep = sorted(nodes, key=lambda n: (0 if n['changed'] else 1, order.get(n['risk'], 3), -(n['adds'] + n['dels'])))[:max_nodes]
+        ids = {n['id'] for n in keep}
+        hidden = len(nodes) - len(keep)
+        nodes = [n for n in nodes if n['id'] in ids]
+        edges = [x for x in edges if x[0] in ids and x[1] in ids]
     level = {n['id']: 0 for n in nodes}
     for _ in range(len(nodes) + 1):
         moved = False
@@ -130,32 +139,54 @@ def svg_diagram(graph):
     for n in nodes:
         cols.setdefault(level[n['id']], []).append(n)
     W, H, GX, GY, PAD = 200, 62, 90, 18, 14
-    pos = {}
-    for lv, ns in cols.items():
-        for i, n in enumerate(ns):
-            pos[n['id']] = (PAD + lv * (W + GX), PAD + i * (H + GY))
-    width = PAD * 2 + (max(cols) + 1) * W + max(cols) * GX
-    height = PAD * 2 + max(len(v) for v in cols.values()) * H + (max(len(v) for v in cols.values()) - 1) * GY
-    o = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" width="{width}" height="{height}" '
-         f'style="max-width:none;font-family:system-ui,sans-serif" role="img">'
-         '<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
+    lr_width = PAD * 2 + (max(cols) + 1) * W + max(cols) * GX
+    pos, vertical = {}, lr_width > lr_limit
+    if not vertical:
+        for lv, ns in cols.items():
+            for i, n in enumerate(ns):
+                pos[n['id']] = (PAD + lv * (W + GX), PAD + i * (H + GY))
+        width = lr_width
+        height = PAD * 2 + max(len(v) for v in cols.values()) * H + (max(len(v) for v in cols.values()) - 1) * GY
+    else:  # top-to-bottom bands, wrapped so the diagram never grows wider than the page
+        per_row = max(1, (avail - PAD * 2 + 24) // (W + 24))
+        y = PAD
+        for lv in sorted(cols):
+            ns = cols[lv]
+            for i, n in enumerate(ns):
+                pos[n['id']] = (PAD + (i % per_row) * (W + 24), y + (i // per_row) * (H + GY))
+            y += ((len(ns) - 1) // per_row + 1) * (H + GY) + 34
+        width = PAD * 2 + per_row * W + (per_row - 1) * 24
+        height = y - 34 + PAD
+    o = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
+         f'style="display:block;width:100%;max-width:{width}px;height:auto;margin:0 auto;font-family:system-ui,sans-serif" role="img">'
+         f'<defs><marker id="arr-{uid}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">'
          '<path d="M0,0 L10,5 L0,10 z" fill="var(--mute)"/></marker></defs>']
     for a, b, style in edges:
-        x1, y1 = pos[a][0] + W, pos[a][1] + H / 2
-        x2, y2 = pos[b][0], pos[b][1] + H / 2
-        if x2 <= x1:  # same column or back edge: loop around below
-            x1, x2 = pos[a][0] + W / 2, pos[b][0] + W / 2
-            y1, y2 = pos[a][1] + H, pos[b][1] + H
-            d = f'M{x1},{y1} C{x1},{y1 + 40} {x2},{y2 + 40} {x2},{y2}'
+        ax, ay = pos[a]
+        bx, by = pos[b]
+        if vertical:
+            x1, y1, x2, y2 = ax + W / 2, ay + H, bx + W / 2, by
+            if y2 <= y1:  # same band or upward: side-to-side hop
+                x1, y1, x2, y2 = (ax + W, ay + H / 2, bx, by + H / 2) if bx > ax else (ax, ay + H / 2, bx + W, by + H / 2)
+                dx = (x2 - x1) / 2
+                d = f'M{x1},{y1} C{x1 + dx},{y1} {x2 - dx},{y2} {x2},{y2}'
+            else:
+                dy = (y2 - y1) / 2
+                d = f'M{x1},{y1} C{x1},{y1 + dy} {x2},{y2 - dy} {x2},{y2}'
         else:
-            dx = (x2 - x1) / 2
-            d = f'M{x1},{y1} C{x1 + dx},{y1} {x2 - dx},{y2} {x2},{y2}'
+            x1, y1, x2, y2 = ax + W, ay + H / 2, bx, by + H / 2
+            if x2 <= x1:
+                x1, x2, y1, y2 = ax + W / 2, bx + W / 2, ay + H, by + H
+                d = f'M{x1},{y1} C{x1},{y1 + 40} {x2},{y2 + 40} {x2},{y2}'
+            else:
+                dx = (x2 - x1) / 2
+                d = f'M{x1},{y1} C{x1 + dx},{y1} {x2 - dx},{y2} {x2},{y2}'
         dash = ' stroke-dasharray="5 4"' if style == 'dashed' else ''
-        o.append(f'<path d="{d}" fill="none" stroke="var(--mute)" stroke-width="1.6"{dash} marker-end="url(#arr)"/>')
+        o.append(f'<path d="{d}" fill="none" stroke="var(--mute)" stroke-width="1.6" opacity=".75"{dash} marker-end="url(#arr-{uid})"/>')
     for n in nodes:
         x, y = pos[n['id']]
         d, b = os.path.split(n['path'])
-        name = b if len(b) <= 26 else b[:25] + '…'
+        name = b if len(b) <= 22 else b[:21] + '…'
         folder = ('…/' + os.path.basename(d)) if d else '.'
         if n['changed']:
             col = {'red': 'var(--red)', 'yellow': 'var(--yellow)', 'green': 'var(--green)'}.get(n['risk'], 'var(--mute)')
@@ -169,6 +200,8 @@ def svg_diagram(graph):
                  f'<text x="{x + 12}" y="{y + 26}" font-size="14" font-weight="600" fill="var(--ink)" direction="ltr">{e(name)}</text>'
                  f'<text x="{x + 12}" y="{y + 47}" font-size="11.5" fill="var(--mute)" direction="ltr">{e(sub)}</text></g>')
     o.append('</svg>')
+    if hidden:
+        o.append(f'<div class="meta" dir="ltr" style="text-align:center;margin-top:6px">+{hidden} more files not drawn (lowest risk / unchanged first). Full list below.</div>')
     return ''.join(o)
 
 
@@ -237,7 +270,8 @@ def main():
 
     # diagram
     if facts['graph']['nodes']:
-        out.append(f'<h2>{e(t["diagram"])}</h2><div class="diagram" dir="ltr">{svg_diagram(facts["graph"])}</div>'
+        out.append(f'<h2>{e(t["diagram"])}</h2><div class="diagram dg-wide" dir="ltr">{svg_diagram(facts["graph"], avail=940, uid="w")}</div>'
+                   f'<div class="diagram dg-narrow" dir="ltr">{svg_diagram(facts["graph"], avail=380, uid="n", lr_limit=0)}</div>'
                    f'<div class="meta" style="margin-top:6px">{e(t["legend"])}</div>')
 
     # security
